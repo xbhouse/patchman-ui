@@ -5,11 +5,13 @@ import {
   getRowByName,
   waitForTableLoad,
   closePopupsIfExist,
+  getRowCellByHeader,
 } from 'test-utils';
 import { cleanupRemediationPlan } from 'test-utils/helpers/cleaners';
 
 test.describe('Advisories Tests', () => {
   test('Create a new remediation plan', async ({ page, request, systems, cleanup }) => {
+    let numAffectedSystems: number;
     const system = await systems.add('system-remediation-plan-test', 'base');
 
     await navigateToAdvisories(page);
@@ -19,9 +21,14 @@ test.describe('Advisories Tests', () => {
     await expect(planButton).toBeDisabled();
 
     await test.step('Select an advisory and check that the button is enabled', async () => {
-      const checkbox = page.getByRole('checkbox', { name: 'Select row 0' });
+      const firstRow = page.locator('tbody > tr').first();
+      const checkbox = firstRow.getByRole('checkbox', { name: 'Select row 0' });
       await checkbox.check();
       await expect(checkbox).toBeChecked();
+
+      const affectedSystemsCell = await getRowCellByHeader(page, firstRow, 'Affected systems');
+      numAffectedSystems = Number((await affectedSystemsCell.textContent())?.trim() ?? '0');
+      expect(numAffectedSystems).toBeGreaterThan(0);
 
       await expect(planButton).toBeEnabled();
     });
@@ -57,7 +64,7 @@ test.describe('Advisories Tests', () => {
         'true',
       );
       await waitForTableLoad(page);
-      await expect(page.getByRole('row')).toHaveCount(2);
+      await expect(page.getByRole('row')).toHaveCount(2); // 1 advisory + header row
 
       await page.getByRole('tab', { name: 'SystemsTab' }).click();
       await expect(page.getByRole('tab', { name: 'SystemsTab' })).toHaveAttribute(
@@ -66,7 +73,7 @@ test.describe('Advisories Tests', () => {
       );
       await waitForTableLoad(page);
       await expect(await getRowByName(page, system.name)).toBeVisible();
-      await expect(page.getByRole('row')).toHaveCount(2);
+      await expect(page.getByRole('row')).toHaveCount(numAffectedSystems + 1); // number of affected systems + header row
 
       await page.getByRole('tab', { name: 'ExecutionHistoryTab' }).click();
       await expect(page.getByRole('tab', { name: 'ExecutionHistoryTab' })).toHaveAttribute(
